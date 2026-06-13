@@ -1,0 +1,9 @@
+# I dati e le credenziali NON devono entrare nel contesto di build dell'immagine.
+# Restano solo sul disco locale (volume montato su /data a runtime).
+smtp-config.json
+richieste.json
+
+# Documentazione e roba non necessaria all'immagine
+installa-gear.md
+.git
+node_modules

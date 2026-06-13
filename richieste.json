@@ -1,0 +1,39 @@
+[
+  {
+    "id": "REQ-001",
+    "canale": "whatsapp",
+    "mittente": "Maria Bianchi (Sc. B int. 7)",
+    "contatto": "+39 333 1234567",
+    "oggetto": "Infiltrazione acqua dal soffitto box",
+    "testo": "Buongiorno, da stamattina c'è una perdita d'acqua dal soffitto del mio box auto al piano interrato. Sta gocciolando parecchio e ho spostato la macchina. Potete mandare qualcuno a controllare? Grazie",
+    "categoria": "Guasto idraulico",
+    "fornitore_suggerito": "Idraulica Rossi Snc — 333 1112233",
+    "urgenza": "alta",
+    "bozza": "Buongiorno Sig.ra Bianchi, grazie per la segnalazione. Allertiamo subito l'idraulico di fiducia del condominio per un sopralluogo urgente al box interrato. La ricontattiamo a breve con l'orario di intervento. Cordiali saluti, lo Studio.",
+    "stato": "gestita"
+  },
+  {
+    "id": "REQ-002",
+    "canale": "mail",
+    "mittente": "Giuseppe Rossi",
+    "contatto": "g.rossi@example.it",
+    "oggetto": "Richiesta copia verbale ultima assemblea",
+    "testo": "Spett.le Amministrazione, non ho potuto partecipare all'assemblea del mese scorso. Chiedo cortesemente di ricevere copia del verbale e del piano di riparto delle spese deliberate. Resto in attesa. Distinti saluti, Giuseppe Rossi",
+    "categoria": "Richiesta documenti",
+    "urgenza": "bassa",
+    "bozza": "Gentile Sig. Rossi, in allegato trova copia del verbale dell'assemblea e il relativo piano di riparto. Restiamo a disposizione per qualsiasi chiarimento. Cordiali saluti, lo Studio.",
+    "stato": "nuova"
+  },
+  {
+    "id": "REQ-003",
+    "canale": "whatsapp",
+    "mittente": "Condòmino Scala A",
+    "contatto": "+39 347 9988776",
+    "oggetto": "Ascensore fermo da ieri sera",
+    "testo": "Salve, l'ascensore della scala A è bloccato al piano terra da ieri sera, dà errore sul display. Ci sono persone anziane ai piani alti che non riescono a scendere. Va sistemato il prima possibile.",
+    "categoria": "Guasto ascensore",
+    "urgenza": "alta",
+    "bozza": "Buongiorno, grazie della segnalazione. Contattiamo immediatamente la ditta di manutenzione dell'ascensore (scala A) per un intervento urgente e diamo priorità ai residenti dei piani alti. Aggiorniamo appena abbiamo l'orario del tecnico. Lo Studio.",
+    "stato": "nuova"
+  }
+]

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GEAR AI — Inbox</title>
+  <style>
+    :root {
+      --bg: #0b1220; --sidebar: #0d1424; --panel: #111c2e; --list: #0f1828;
+      --card: #16223a; --hover: #1b2942; --sel: #1d2d4a;
+      --text: #e6edf6; --muted: #8a99ad; --faint: #5d6b80;
+      --line: #1f2c44; --accent: #3b82f6; --accent-soft: rgba(59,130,246,.15);
+      --wa: #25d366; --mail: #f59e0b;
+      --alta: #ef4444; --media: #f59e0b; --bassa: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           background: var(--bg); color: var(--text); overflow: hidden; }
+    .app { display: grid; grid-template-columns: 220px 360px 1fr; height: 100vh; }
+
+    /* ---------- SIDEBAR ---------- */
+    .sidebar { background: var(--sidebar); border-right: 1px solid var(--line);
+               display: flex; flex-direction: column; padding: 18px 12px; }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px;
+             font-weight: 800; font-size: 18px; letter-spacing: .5px; }
+    .brand .logo { width: 30px; height: 30px; border-radius: 8px;
+                   background: linear-gradient(135deg, #3b82f6, #06b6d4);
+                   display: grid; place-items: center; font-size: 16px; }
+    .brand .ai { color: var(--accent); }
+    .nav { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+    .nav a { display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+             border-radius: 9px; color: var(--muted); text-decoration: none;
+             font-size: 14px; cursor: pointer; }
+    .nav a .ic { width: 18px; text-align: center; font-size: 15px; }
+    .nav a:hover { background: var(--hover); color: var(--text); }
+    .nav a.active { background: var(--accent-soft); color: #cfe0ff; font-weight: 600; }
+    .nav .sep { height: 1px; background: var(--line); margin: 10px 6px; }
+    .nav-bottom { margin-top: auto; }
+
+    /* ---------- COLONNA LISTA ---------- */
+    .list { background: var(--list); border-right: 1px solid var(--line);
+            display: flex; flex-direction: column; min-height: 0; }
+    .list-head { padding: 18px 18px 12px; border-bottom: 1px solid var(--line); }
+    .list-title { display: flex; align-items: baseline; gap: 10px; }
+    .list-title h2 { margin: 0; font-size: 19px; }
+    .list-title .count { color: var(--faint); font-size: 13px; }
+    .search { margin-top: 12px; position: relative; }
+    .search input { width: 100%; background: var(--card); border: 1px solid var(--line);
+                    border-radius: 9px; padding: 9px 12px 9px 34px; color: var(--text);
+                    font-size: 13px; }
+    .search input:focus { outline: none; border-color: var(--accent); }
+    .search .mag { position: absolute; left: 11px; top: 8px; color: var(--faint); font-size: 14px; }
+    .pills { display: flex; gap: 8px; margin-top: 12px; }
+    .pill { border: 1px solid var(--line); background: transparent; color: var(--muted);
+            border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+            display: inline-flex; align-items: center; gap: 6px; }
+    .pill:hover { background: var(--hover); }
+    .pill.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+    .pill .n { opacity: .75; }
+    .rows { overflow-y: auto; flex: 1; min-height: 0; }
+    .row { display: flex; gap: 11px; padding: 13px 18px; border-bottom: 1px solid var(--line);
+           cursor: pointer; align-items: flex-start; }
+    .row:hover { background: var(--hover); }
+    .row.sel { background: var(--sel); box-shadow: inset 3px 0 0 var(--accent); }
+    .row .ch { width: 30px; height: 30px; border-radius: 8px; flex: 0 0 auto;
+               display: grid; place-items: center; font-size: 15px; }
+    .row .ch.wa { background: rgba(37,211,102,.15); }
+    .row .ch.mail { background: rgba(245,158,11,.15); }
+    .row .body { min-width: 0; flex: 1; }
+    .row .l1 { display: flex; align-items: center; gap: 8px; }
+    .row .from { font-weight: 700; font-size: 14px; white-space: nowrap;
+                 overflow: hidden; text-overflow: ellipsis; }
+    .row .dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; margin-left: auto; }
+    .row .dot.alta { background: var(--alta); }
+    .row .dot.media { background: var(--media); }
+    .row .dot.bassa { background: var(--bassa); }
+    .row .subj { font-size: 13px; color: var(--text); margin-top: 1px;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .prev { font-size: 12px; color: var(--muted); margin-top: 2px;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ---------- PANNELLO DETTAGLIO ---------- */
+    .detail { background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+    .empty { margin: auto; text-align: center; color: var(--faint); }
+    .empty .big { font-size: 40px; margin-bottom: 12px; }
+    .d-wrap { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+    .d-head { padding: 22px 28px 16px; border-bottom: 1px solid var(--line); }
+    .d-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .chip { font-size: 12px; font-weight: 600; padding: 4px 11px; border-radius: 999px;
+            display: inline-flex; align-items: center; gap: 6px; }
+    .chip.wa { background: rgba(37,211,102,.15); color: var(--wa); }
+    .chip.mail { background: rgba(245,158,11,.15); color: var(--mail); }
+    .chip.cat { background: var(--accent-soft); color: #9dc1ff; }
+    .chip.done { background: rgba(34,197,94,.15); color: var(--bassa); }
+    .urg { margin-left: auto; font-size: 11px; font-weight: 700; text-transform: uppercase;
+           letter-spacing: .5px; padding: 4px 11px; border-radius: 999px; }
+    .urg.alta { background: rgba(239,68,68,.15); color: var(--alta); }
+    .urg.media { background: rgba(245,158,11,.15); color: var(--media); }
+    .urg.bassa { background: rgba(34,197,94,.15); color: var(--bassa); }
+    .d-from { font-size: 20px; font-weight: 700; margin-top: 14px; }
+    .d-contact { color: var(--muted); font-size: 13px; margin-top: 3px; }
+    .d-subj { font-size: 15px; font-weight: 600; margin-top: 14px; }
+    .d-fornitore { font-size: 13px; color: var(--muted); margin-top: 10px; }
+    .d-fornitore strong { color: #9dc1ff; font-weight: 600; }
+    .d-scroll { overflow-y: auto; padding: 20px 28px 28px; flex: 1; min-height: 0; }
+    .d-text { font-size: 14px; line-height: 1.6; color: #cdd7e4;
+              background: var(--card); border: 1px solid var(--line);
+              border-radius: 11px; padding: 16px 18px; }
+    .lbl { display: block; font-size: 11px; color: var(--faint); margin: 22px 0 8px;
+           text-transform: uppercase; letter-spacing: .6px; }
+    textarea { width: 100%; min-height: 130px; resize: vertical; background: #0b1322;
+               color: var(--text); border: 1px solid var(--line); border-radius: 11px;
+               padding: 14px; font-family: inherit; font-size: 14px; line-height: 1.6; }
+    textarea:focus { outline: none; border-color: var(--accent); }
+    .actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+    button.act { border: none; border-radius: 10px; padding: 11px 22px; font-size: 14px;
+                 font-weight: 600; cursor: pointer; }
+    .invia { background: var(--accent); color: #fff; }
+    .invia:hover { background: #2f6fd6; }
+    .salta { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+    .salta:hover { background: var(--hover); color: var(--text); }
+    button.act:active { transform: translateY(1px); }
+    .msg { font-size: 13px; color: var(--muted); margin-left: 6px; }
+    .rows::-webkit-scrollbar, .d-scroll::-webkit-scrollbar { width: 9px; }
+    .rows::-webkit-scrollbar-thumb, .d-scroll::-webkit-scrollbar-thumb {
+      background: #243352; border-radius: 9px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="brand"><span class="logo">⚙️</span> GEAR <span class="ai">AI</span></div>
+      <nav class="nav">
+        <a class="active" data-v="inbox"><span class="ic">📥</span> Inbox</a>
+        <a data-v="archivio"><span class="ic">🗄️</span> Archivio</a>
+      </nav>
+    </aside>
+
+    <!-- COLONNA LISTA -->
+    <section class="list">
+      <div class="list-head">
+        <div class="list-title">
+          <h2>Inbox</h2>
+          <span class="count" id="count">—</span>
+        </div>
+        <div class="search">
+          <span class="mag">🔍</span>
+          <input id="search" type="text" placeholder="Cerca per mittente, oggetto, testo…" />
+        </div>
+        <div class="pills" id="pills">
+          <button class="pill active" data-f="tutti">Tutti <span class="n" id="n-tutti">0</span></button>
+          <button class="pill" data-f="mail">✉️ Email <span class="n" id="n-mail">0</span></button>
+          <button class="pill" data-f="whatsapp">💬 WhatsApp <span class="n" id="n-wa">0</span></button>
+        </div>
+      </div>
+      <div class="rows" id="rows"></div>
+    </section>
+
+    <!-- PANNELLO DETTAGLIO -->
+    <section class="detail" id="detail">
+      <div class="empty">
+        <div class="big">✉️</div>
+        <div>Seleziona una conversazione</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let RICHIESTE = [];
+    let filtro = 'tutti';
+    let cerca = '';
+    let selId = null;
+    let vista = 'inbox';
+
+    const isWA = (c) => c === 'whatsapp';
+    const chIcon = (c) => isWA(c) ? '💬' : '✉️';
+
+    function visibili() {
+      return RICHIESTE.filter(r => {
+        const gestita = r.stato === 'gestita';
+        if (vista === 'archivio' ? !gestita : gestita) return false;
+        if (filtro !== 'tutti' && r.canale !== filtro) return false;
+        if (cerca) {
+          const t = (r.mittente + ' ' + r.oggetto + ' ' + r.testo).toLowerCase();
+          if (!t.includes(cerca.toLowerCase())) return false;
+        }
+        return true;
+      });
+    }
+
+    function aggiornaContatori() {
+      const base = RICHIESTE.filter(r =>
+        vista === 'archivio' ? r.stato === 'gestita' : r.stato !== 'gestita');
+      const tot = base.length;
+      const mail = base.filter(r => r.canale === 'mail').length;
+      const wa = base.filter(r => r.canale === 'whatsapp').length;
+      document.getElementById('n-tutti').textContent = tot;
+      document.getElementById('n-mail').textContent = mail;
+      document.getElementById('n-wa').textContent = wa;
+      document.getElementById('count').textContent = vista === 'archivio'
+        ? tot + ' archiviate'
+        : tot + ' conversazioni · ' + tot + ' da gestire';
+    }
+
+    function renderLista() {
+      const cont = document.getElementById('rows');
+      const dati = visibili();
+      cont.innerHTML = '';
+      if (dati.length === 0) {
+        const vuoto = vista === 'archivio' ? 'Nessuna richiesta gestita' : 'Nessun risultato';
+        cont.innerHTML = '<div style="padding:30px;text-align:center;color:var(--faint)">' + vuoto + '</div>';
+        return;
+      }
+      dati.forEach(r => {
+        const row = document.createElement('div');
+        row.className = 'row' + (r.id === selId ? ' sel' : '');
+        row.innerHTML = `
+          <div class="ch ${isWA(r.canale) ? 'wa' : 'mail'}">${chIcon(r.canale)}</div>
+          <div class="body">
+            <div class="l1">
+              <span class="from">${r.mittente}</span>
+              <span class="dot ${r.urgenza}" title="urgenza ${r.urgenza}"></span>
+            </div>
+            <div class="subj">${r.oggetto}</div>
+            <div class="prev">${r.testo}</div>
+          </div>`;
+        row.onclick = () => { selId = r.id; renderLista(); renderDettaglio(); };
+        cont.appendChild(row);
+      });
+    }
+
+    function renderDettaglio() {
+      const d = document.getElementById('detail');
+      const r = RICHIESTE.find(x => x.id === selId);
+      if (!r) {
+        d.innerHTML = '<div class="empty"><div class="big">✉️</div><div>Seleziona una conversazione</div></div>';
+        return;
+      }
+      const gestita = r.stato === 'gestita';
+      d.innerHTML = `
+        <div class="d-wrap">
+          <div class="d-head">
+            <div class="d-top">
+              <span class="chip ${isWA(r.canale) ? 'wa' : 'mail'}">${chIcon(r.canale)} ${isWA(r.canale) ? 'WhatsApp' : 'Mail'}</span>
+              <span class="chip cat">${r.categoria ?? ''}</span>
+              ${gestita ? '<span class="chip done">✓ Gestita</span>' : ''}
+              <span class="urg ${r.urgenza}">${r.urgenza}</span>
+            </div>
+            ${r.fornitore_suggerito ? `<div class="d-fornitore">🔧 Fornitore suggerito: <strong>${r.fornitore_suggerito}</strong></div>` : ''}
+            <div class="d-from">${r.mittente}</div>
+            <div class="d-contact">${r.contatto}</div>
+            <div class="d-subj">${r.oggetto}</div>
+          </div>
+          <div class="d-scroll">
+            <span class="lbl">Messaggio ricevuto</span>
+            <div class="d-text">${r.testo}</div>
+            ${gestita ? `
+              <span class="lbl">Risposta inviata</span>
+              <div class="d-text">${r.bozza ?? ''}</div>
+            ` : `
+              <span class="lbl">Bozza di risposta (modificabile)</span>
+              <textarea id="bozza">${r.bozza ?? ''}</textarea>
+              <div class="actions">
+                <button class="act invia" id="btn-primary">Invia</button>
+                <button class="act salta" id="btn-salta">Salta</button>
+                <span class="msg" id="msg"></span>
+              </div>
+            `}
+          </div>
+        </div>`;
+      if (gestita) return;
+      const ta = d.querySelector('#bozza');
+      const msg = d.querySelector('#msg');
+      const btn = d.querySelector('#btn-primary');
+      btn.onclick = () => {
+        if (isWA(r.canale)) inviaWhatsapp(r, ta.value, msg, btn);
+        else inviaMail(r, ta.value, msg, btn);
+      };
+      d.querySelector('#btn-salta').onclick = () => logAzione('salta', r, ta.value, msg);
+    }
+
+    // STEP 2: invio reale WhatsApp via il server (che parla con WAHA)
+    async function inviaWhatsapp(r, testo, msg, btn) {
+      msg.style.color = 'var(--muted)';
+      msg.textContent = 'invio in corso…';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/invia', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ numero: r.contatto, testo })
+        });
+        const out = await res.json();
+        if (res.ok && out.ok) {
+          msg.style.color = 'var(--bassa)';
+          msg.textContent = '✓ inviato su WhatsApp';
+          await archivia(r, msg);
+        } else {
+          msg.style.color = 'var(--alta)';
+          msg.textContent = '✗ errore invio: ' + (out.errore || ('WAHA ' + out.status));
+        }
+      } catch (e) {
+        msg.style.color = 'var(--alta)';
+        msg.textContent = '✗ errore rete: ' + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // STEP 2-bis: invio reale Mail via il server (che parla con SMTP)
+    async function inviaMail(r, testo, msg, btn) {
+      msg.style.color = 'var(--muted)';
+      msg.textContent = 'invio in corso…';
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/invia-mail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ destinatario: r.contatto, oggetto: 'Re: ' + r.oggetto, testo })
+        });
+        const out = await res.json();
+        if (res.ok && out.ok) {
+          msg.style.color = 'var(--bassa)';
+          msg.textContent = '✓ email inviata';
+          await archivia(r, msg);
+        } else {
+          msg.style.color = 'var(--alta)';
+          msg.textContent = '✗ errore invio: ' + (out.errore || ('HTTP ' + res.status));
+        }
+      } catch (e) {
+        msg.style.color = 'var(--alta)';
+        msg.textContent = '✗ errore rete: ' + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // Persiste lo stato "gestita" su richieste.json e sposta la richiesta in Archivio
+    async function archivia(r, msg) {
+      try {
+        const res = await fetch('/api/stato', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: r.id, stato: 'gestita' })
+        });
+        const out = await res.json();
+        if (res.ok && out.ok) {
+          r.stato = 'gestita';
+          msg.textContent += ' — spostata in Archivio';
+          aggiornaContatori();
+          renderLista();
+        } else {
+          msg.style.color = 'var(--media)';
+          msg.textContent += ' (stato NON salvato: ' + (out.errore || ('HTTP ' + res.status)) + ')';
+        }
+      } catch (e) {
+        msg.style.color = 'var(--media)';
+        msg.textContent += ' (errore salvataggio stato: ' + e.message + ')';
+      }
+    }
+
+    async function logAzione(azione, r, testo, msg) {
+      msg.style.color = 'var(--muted)';
+      msg.textContent = '…';
+      try {
+        await fetch('/api/log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ azione, id: r.id, canale: r.canale, testo })
+        });
+        msg.textContent = azione === 'salta'
+          ? 'saltata (loggato)'
+          : 'bozza loggata (invio mail: STEP 3)';
+      } catch (e) {
+        msg.textContent = 'errore log';
+      }
+    }
+
+    function bindNav() {
+      document.querySelectorAll('.nav a').forEach(a => {
+        a.onclick = () => {
+          document.querySelectorAll('.nav a').forEach(x => x.classList.remove('active'));
+          a.classList.add('active');
+          vista = a.dataset.v;
+          selId = null;
+          document.querySelector('.list-title h2').textContent =
+            vista === 'inbox' ? 'Inbox' : 'Archivio';
+          document.getElementById('count').style.visibility = 'visible';
+          aggiornaContatori();
+          renderLista();
+          renderDettaglio();
+        };
+      });
+    }
+
+    function bindFiltri() {
+      document.querySelectorAll('.pill').forEach(p => {
+        p.onclick = () => {
+          document.querySelectorAll('.pill').forEach(x => x.classList.remove('active'));
+          p.classList.add('active');
+          filtro = p.dataset.f;
+          renderLista();
+        };
+      });
+      document.getElementById('search').oninput = (e) => {
+        cerca = e.target.value;
+        renderLista();
+      };
+    }
+
+    async function carica() {
+      try {
+        const res = await fetch('/api/richieste');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        RICHIESTE = await res.json();
+        aggiornaContatori();
+        renderLista();
+        bindNav();
+        bindFiltri();
+      } catch (e) {
+        document.getElementById('rows').innerHTML =
+          '<div style="padding:30px;color:#fca5a5">Errore caricamento: ' + e.message + '</div>';
+      }
+    }
+    carica();
+  </script>
+</body>
+</html>
