@@ -193,6 +193,45 @@
     .rows::-webkit-scrollbar, .d-scroll::-webkit-scrollbar { width: 9px; }
     .rows::-webkit-scrollbar-thumb, .d-scroll::-webkit-scrollbar-thumb {
       background: #243352; border-radius: 9px; }
+
+    /* ---------- GMAIL MODAL ---------- */
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.6); display: flex;
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.hidden { display: none; }
+    .modal-box {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 16px; padding: 32px 36px; width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    }
+    .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+    .modal-sub   { font-size: 13px; color: var(--muted); margin-bottom: 24px; line-height: 1.5; }
+    .modal-field { margin-bottom: 14px; }
+    .modal-field label { display: block; font-size: 12px; color: var(--faint);
+                         text-transform: uppercase; letter-spacing: .5px; margin-bottom: 5px; }
+    .modal-field input {
+      width: 100%; background: var(--bg); border: 1px solid var(--line);
+      border-radius: 9px; padding: 10px 13px; color: var(--text); font-size: 14px;
+    }
+    .modal-field input:focus { outline: none; border-color: var(--accent); }
+    .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-actions button { flex: 1; border: none; border-radius: 9px; padding: 11px;
+                            font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #2f6fd6; }
+    .btn-secondary { background: transparent; color: var(--muted); border: 1px solid var(--line) !important; }
+    .btn-secondary:hover { background: var(--hover); }
+    .modal-msg { font-size: 13px; text-align: center; margin-top: 12px; min-height: 18px; }
+    .modal-msg.ok  { color: var(--bassa); }
+    .modal-msg.err { color: var(--alta); }
+    .gmail-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 11px; padding: 3px 8px; border-radius: 6px; margin-left: 4px;
+    }
+    .gmail-badge.on  { background: rgba(34,197,94,.15); color: var(--bassa); }
+    .gmail-badge.off { background: rgba(239,68,68,.12); color: var(--alta); }
   </style>
 </head>
 <body>
@@ -220,6 +259,31 @@
     </div>
   </div>
 
+  <!-- GMAIL MODAL -->
+  <div class="modal-backdrop hidden" id="gmail-modal">
+    <div class="modal-box">
+      <div class="modal-title">📧 Connetti Gmail</div>
+      <div class="modal-sub">
+        Inserisci la tua email Google e una <strong>App Password</strong> (non la password principale).<br>
+        Per generarla: <em>Account Google → Sicurezza → Verifica in 2 passaggi → App Password</em>.
+      </div>
+      <div class="modal-field">
+        <label>Email Gmail / Google Workspace</label>
+        <input type="email" id="gm-user" placeholder="nome@gmail.com" />
+      </div>
+      <div class="modal-field">
+        <label>App Password (16 caratteri)</label>
+        <input type="password" id="gm-pass" placeholder="xxxx xxxx xxxx xxxx" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" onclick="chiudiGmailModal()">Annulla</button>
+        <button class="btn-primary" id="gm-test-btn" onclick="testImap()">Testa connessione</button>
+        <button class="btn-primary" id="gm-save-btn" onclick="salvaGmail()">Salva</button>
+      </div>
+      <div class="modal-msg" id="gm-msg"></div>
+    </div>
+  </div>
+
   <!-- APP PRINCIPALE -->
   <div class="app" id="app">
     <!-- SIDEBAR -->
@@ -229,6 +293,11 @@
         <a class="active" data-v="inbox"><span class="ic">📥</span> Inbox</a>
         <a data-v="archivio"><span class="ic">🗄️</span> Archivio</a>
         <div class="nav-bottom">
+          <div class="sep"></div>
+          <a onclick="apriGmailModal()" style="cursor:pointer">
+            <span class="ic">📧</span> Gmail
+            <span class="gmail-badge off" id="gmail-badge">non collegata</span>
+          </a>
           <div class="sep"></div>
           <div class="user-info" id="user-email-label"></div>
           <button class="btn-logout" onclick="logout()">
@@ -334,6 +403,9 @@
         document.getElementById('app').classList.add('visible');
         document.getElementById('user-email-label').textContent = session.user.email;
         carica();
+        aggiornaGmailBadge();
+        processaEmailQueue();
+        setInterval(processaEmailQueue, 30_000);
       } else {
         document.getElementById('auth-overlay').classList.remove('hidden');
         document.getElementById('app').classList.remove('visible');
@@ -343,6 +415,116 @@
 
     document.getElementById('auth-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
     document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+
+    // ─── GMAIL MODAL ──────────────────────────────────────────────────────────
+
+    async function aggiornaGmailBadge() {
+      try {
+        const res = await fetch('/api/gmail-status');
+        const { configurata, user } = await res.json();
+        const badge = document.getElementById('gmail-badge');
+        if (configurata) {
+          badge.className = 'gmail-badge on';
+          badge.textContent = user;
+        } else {
+          badge.className = 'gmail-badge off';
+          badge.textContent = 'non collegata';
+        }
+      } catch (e) {}
+    }
+
+    function apriGmailModal() {
+      document.getElementById('gmail-modal').classList.remove('hidden');
+      setGmailMsg('', '');
+    }
+
+    function chiudiGmailModal() {
+      document.getElementById('gmail-modal').classList.add('hidden');
+    }
+
+    function setGmailMsg(txt, tipo) {
+      const el = document.getElementById('gm-msg');
+      el.textContent = txt;
+      el.className = 'modal-msg' + (tipo ? ' ' + tipo : '');
+    }
+
+    async function testImap() {
+      const btn = document.getElementById('gm-test-btn');
+      btn.disabled = true;
+      setGmailMsg('Test in corso…', '');
+      const user = document.getElementById('gm-user').value.trim();
+      const pass = document.getElementById('gm-pass').value.trim();
+      if (!user || !pass) { setGmailMsg('Inserisci email e App Password.', 'err'); btn.disabled = false; return; }
+      // salva temporaneamente per il test
+      await fetch('/api/config-gmail', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user, app_password: pass })
+      });
+      const res = await fetch('/api/test-imap', { method: 'POST' });
+      const out = await res.json();
+      btn.disabled = false;
+      if (out.ok) setGmailMsg('✓ Connessione riuscita. Clicca Salva per confermare.', 'ok');
+      else        setGmailMsg('✗ ' + out.errore, 'err');
+    }
+
+    async function salvaGmail() {
+      const btn = document.getElementById('gm-save-btn');
+      btn.disabled = true;
+      setGmailMsg('Salvataggio…', '');
+      const user = document.getElementById('gm-user').value.trim();
+      const pass = document.getElementById('gm-pass').value.trim();
+      if (!user || !pass) { setGmailMsg('Inserisci email e App Password.', 'err'); btn.disabled = false; return; }
+      const res = await fetch('/api/config-gmail', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user, app_password: pass })
+      });
+      const out = await res.json();
+      btn.disabled = false;
+      if (out.ok) {
+        setGmailMsg('✓ Gmail collegata! Le email arriveranno in GEAR entro 60 secondi.', 'ok');
+        aggiornaGmailBadge();
+        setTimeout(chiudiGmailModal, 2000);
+      } else {
+        setGmailMsg('✗ ' + out.errore, 'err');
+      }
+    }
+
+    // ─── CODA EMAIL IMAP → SUPABASE ───────────────────────────────────────────
+
+    async function processaEmailQueue() {
+      if (!SESSION) return;
+      try {
+        const res  = await fetch('/api/email-queue');
+        const coda = await res.json();
+        if (!Array.isArray(coda) || !coda.length) return;
+
+        const elaborate = [];
+        for (const email of coda) {
+          const { messageId, ...dati } = email;
+          const { error } = await supabase
+            .from('richieste')
+            .insert({ ...dati, user_id: SESSION.user.id });
+          if (!error) {
+            elaborate.push(email.id);
+            RICHIESTE.unshift({ ...dati, user_id: SESSION.user.id });
+          } else {
+            console.warn('[GEAR][queue] insert fallita per', email.id, ':', error.message);
+          }
+        }
+
+        if (elaborate.length > 0) {
+          await fetch('/api/email-queue/ack', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: elaborate })
+          });
+          aggiornaContatori();
+          renderLista();
+          console.log('[GEAR][queue] inserite', elaborate.length, 'email in Supabase');
+        }
+      } catch (e) {
+        console.warn('[GEAR][queue] errore:', e.message);
+      }
+    }
 
     // ─── DASHBOARD ────────────────────────────────────────────────────────────
     let RICHIESTE = [];
