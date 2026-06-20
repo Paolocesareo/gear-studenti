@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GEAR AI — Inbox</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
   <style>
     :root {
       --bg: #0b1220; --sidebar: #0d1424; --panel: #111c2e; --list: #0f1828;
@@ -270,7 +270,9 @@
   <script>
     // ─── SUPABASE AUTH ────────────────────────────────────────────────────────
     const SUPABASE_URL  = 'https://xxddmyglmjgibgvgfoit.supabase.co';
-    const SUPABASE_ANON = 'sb_publishable_IEkj3z7XbjFiyANcC2o9sQ_Tf0UeLK2';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4ZGRteWdsbWpnaWJndmdmb2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NDQ4NTEsImV4cCI6MjA5NzUyMDg1MX0.yJw0YBxIV5q_YZ0SUt7HQ3Zj518H3t76EK-draOsnn8';
+
+    if (!window.supabase) { document.body.innerHTML = '<p style="color:#fca5a5;padding:40px">Errore: libreria Supabase non caricata. Verifica la connessione.</p>'; throw new Error('supabase-js CDN failed'); }
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
     let currentTab = 'login';
