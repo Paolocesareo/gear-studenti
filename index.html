@@ -404,8 +404,8 @@
         document.getElementById('user-email-label').textContent = session.user.email;
         carica();
         aggiornaGmailBadge();
-        processaEmailQueue();
-        setInterval(processaEmailQueue, 30_000);
+        pollGmail();
+        setInterval(pollGmail, 60_000);
       } else {
         document.getElementById('auth-overlay').classList.remove('hidden');
         document.getElementById('app').classList.remove('visible');
@@ -418,14 +418,20 @@
 
     // ─── GMAIL MODAL ──────────────────────────────────────────────────────────
 
+    function authHeaders() {
+      const token = SESSION?.access_token;
+      return { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
+    }
+
     async function aggiornaGmailBadge() {
+      if (!SESSION) return;
       try {
-        const res = await fetch('/api/gmail-status');
-        const { configurata, user } = await res.json();
+        const { data } = await supabase.from('user_settings').select('gmail_user').maybeSingle();
         const badge = document.getElementById('gmail-badge');
-        if (configurata) {
+        if (data?.gmail_user) {
           badge.className = 'gmail-badge on';
-          badge.textContent = user;
+          badge.textContent = data.gmail_user;
+          document.getElementById('gm-user').value = data.gmail_user;
         } else {
           badge.className = 'gmail-badge off';
           badge.textContent = 'non collegata';
@@ -451,20 +457,20 @@
     async function testImap() {
       const btn = document.getElementById('gm-test-btn');
       btn.disabled = true;
-      setGmailMsg('Test in corso…', '');
+      setGmailMsg('Test in corso (può richiedere 10 secondi)…', '');
       const user = document.getElementById('gm-user').value.trim();
       const pass = document.getElementById('gm-pass').value.trim();
       if (!user || !pass) { setGmailMsg('Inserisci email e App Password.', 'err'); btn.disabled = false; return; }
-      // salva temporaneamente per il test
-      await fetch('/api/config-gmail', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, app_password: pass })
-      });
-      const res = await fetch('/api/test-imap', { method: 'POST' });
+      // Salva temporaneamente e tenta un poll (0 email attese = connessione OK)
+      await supabase.from('user_settings').upsert({ user_id: SESSION.user.id, gmail_user: user, gmail_app_password: pass });
+      const res = await fetch('/api/poll-gmail', { method: 'POST', headers: authHeaders() });
       const out = await res.json();
       btn.disabled = false;
-      if (out.ok) setGmailMsg('✓ Connessione riuscita. Clicca Salva per confermare.', 'ok');
-      else        setGmailMsg('✗ ' + out.errore, 'err');
+      if (out.ok) {
+        setGmailMsg('✓ Connessione riuscita! Clicca Salva per confermare.', 'ok');
+      } else {
+        setGmailMsg('✗ ' + (out.errore || 'errore sconosciuto'), 'err');
+      }
     }
 
     async function salvaGmail() {
@@ -474,56 +480,29 @@
       const user = document.getElementById('gm-user').value.trim();
       const pass = document.getElementById('gm-pass').value.trim();
       if (!user || !pass) { setGmailMsg('Inserisci email e App Password.', 'err'); btn.disabled = false; return; }
-      const res = await fetch('/api/config-gmail', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user, app_password: pass })
-      });
-      const out = await res.json();
+      const { error } = await supabase.from('user_settings')
+        .upsert({ user_id: SESSION.user.id, gmail_user: user, gmail_app_password: pass });
       btn.disabled = false;
-      if (out.ok) {
+      if (!error) {
         setGmailMsg('✓ Gmail collegata! Le email arriveranno in GEAR entro 60 secondi.', 'ok');
         aggiornaGmailBadge();
         setTimeout(chiudiGmailModal, 2000);
       } else {
-        setGmailMsg('✗ ' + out.errore, 'err');
+        setGmailMsg('✗ ' + error.message, 'err');
       }
     }
 
-    // ─── CODA EMAIL IMAP → SUPABASE ───────────────────────────────────────────
+    // ─── POLLING GMAIL → SUPABASE (via Netlify Function) ─────────────────────
 
-    async function processaEmailQueue() {
+    async function pollGmail() {
       if (!SESSION) return;
       try {
-        const res  = await fetch('/api/email-queue');
-        const coda = await res.json();
-        if (!Array.isArray(coda) || !coda.length) return;
-
-        const elaborate = [];
-        for (const email of coda) {
-          const { messageId, ...dati } = email;
-          const { error } = await supabase
-            .from('richieste')
-            .insert({ ...dati, user_id: SESSION.user.id });
-          if (!error) {
-            elaborate.push(email.id);
-            RICHIESTE.unshift({ ...dati, user_id: SESSION.user.id });
-          } else {
-            console.warn('[GEAR][queue] insert fallita per', email.id, ':', error.message);
-          }
+        const res = await fetch('/api/poll-gmail', { method: 'POST', headers: authHeaders() });
+        const out = await res.json();
+        if (out.ok && out.inserite > 0) {
+          await carica();
         }
-
-        if (elaborate.length > 0) {
-          await fetch('/api/email-queue/ack', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ids: elaborate })
-          });
-          aggiornaContatori();
-          renderLista();
-          console.log('[GEAR][queue] inserite', elaborate.length, 'email in Supabase');
-        }
-      } catch (e) {
-        console.warn('[GEAR][queue] errore:', e.message);
-      }
+      } catch (e) {}
     }
 
     // ─── DASHBOARD ────────────────────────────────────────────────────────────
@@ -648,7 +627,7 @@
       try {
         const res = await fetch('/api/invia', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify({ numero: r.contatto, testo })
         });
         const out = await res.json();
@@ -675,7 +654,7 @@
       try {
         const res = await fetch('/api/invia-mail', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify({ destinatario: r.contatto, oggetto: 'Re: ' + r.oggetto, testo })
         });
         const out = await res.json();
