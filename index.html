@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GEAR AI — Inbox</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
       --bg: #0b1220; --sidebar: #0d1424; --panel: #111c2e; --list: #0f1828;
@@ -17,7 +18,64 @@
     html, body { height: 100%; margin: 0; }
     body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
            background: var(--bg); color: var(--text); overflow: hidden; }
-    .app { display: grid; grid-template-columns: 220px 360px 1fr; height: 100vh; }
+
+    /* ---------- LOGIN OVERLAY ---------- */
+    #auth-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+    }
+    #auth-overlay.hidden { display: none; }
+    .auth-box {
+      background: var(--card); border: 1px solid var(--line);
+      border-radius: 18px; padding: 40px 44px; width: 380px;
+      box-shadow: 0 24px 80px rgba(0,0,0,.6);
+    }
+    .auth-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 800; font-size: 22px; margin-bottom: 28px; justify-content: center;
+    }
+    .auth-brand .logo {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4);
+      display: grid; place-items: center; font-size: 18px;
+    }
+    .auth-brand .ai { color: var(--accent); }
+    .auth-tabs {
+      display: flex; gap: 0; margin-bottom: 28px;
+      border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+    }
+    .auth-tab {
+      flex: 1; padding: 10px; background: transparent; border: none;
+      color: var(--muted); font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .auth-tab.active { background: var(--accent); color: #fff; }
+    .auth-field { margin-bottom: 16px; }
+    .auth-field label { display: block; font-size: 12px; color: var(--faint);
+                        text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .auth-field input {
+      width: 100%; background: var(--bg); border: 1px solid var(--line);
+      border-radius: 9px; padding: 11px 13px; color: var(--text); font-size: 14px;
+    }
+    .auth-field input:focus { outline: none; border-color: var(--accent); }
+    .auth-btn {
+      width: 100%; background: var(--accent); color: #fff; border: none;
+      border-radius: 10px; padding: 13px; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 8px;
+    }
+    .auth-btn:hover { background: #2f6fd6; }
+    .auth-btn:active { transform: translateY(1px); }
+    .auth-btn:disabled { opacity: .5; cursor: default; transform: none; }
+    .auth-msg {
+      margin-top: 14px; font-size: 13px; text-align: center; min-height: 20px;
+      border-radius: 8px; padding: 0 4px;
+    }
+    .auth-msg.ok { color: var(--bassa); }
+    .auth-msg.err { color: var(--alta); }
+
+    /* ---------- APP (nascosta fino al login) ---------- */
+    .app { display: none; grid-template-columns: 220px 360px 1fr; height: 100vh; }
+    .app.visible { display: grid; }
 
     /* ---------- SIDEBAR ---------- */
     .sidebar { background: var(--sidebar); border-right: 1px solid var(--line);
@@ -37,6 +95,16 @@
     .nav a.active { background: var(--accent-soft); color: #cfe0ff; font-weight: 600; }
     .nav .sep { height: 1px; background: var(--line); margin: 10px 6px; }
     .nav-bottom { margin-top: auto; }
+    .user-info {
+      padding: 10px 12px 6px; font-size: 12px; color: var(--faint);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .btn-logout {
+      display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+      border-radius: 9px; color: var(--muted); font-size: 14px;
+      cursor: pointer; border: none; background: transparent; width: 100%;
+    }
+    .btn-logout:hover { background: var(--hover); color: var(--alta); }
 
     /* ---------- COLONNA LISTA ---------- */
     .list { background: var(--list); border-right: 1px solid var(--line);
@@ -128,13 +196,45 @@
   </style>
 </head>
 <body>
-  <div class="app">
+
+  <!-- LOGIN / REGISTRAZIONE -->
+  <div id="auth-overlay">
+    <div class="auth-box">
+      <div class="auth-brand">
+        <span class="logo">⚙️</span> GEAR <span class="ai">AI</span>
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login" onclick="switchTab('login')">Accedi</button>
+        <button class="auth-tab" id="tab-signup" onclick="switchTab('signup')">Registrati</button>
+      </div>
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="auth-email" placeholder="email@studio.it" autocomplete="email" />
+      </div>
+      <div class="auth-field">
+        <label>Password</label>
+        <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+      <button class="auth-btn" id="auth-submit" onclick="submitAuth()">Accedi</button>
+      <div class="auth-msg" id="auth-msg"></div>
+    </div>
+  </div>
+
+  <!-- APP PRINCIPALE -->
+  <div class="app" id="app">
     <!-- SIDEBAR -->
     <aside class="sidebar">
       <div class="brand"><span class="logo">⚙️</span> GEAR <span class="ai">AI</span></div>
       <nav class="nav">
         <a class="active" data-v="inbox"><span class="ic">📥</span> Inbox</a>
         <a data-v="archivio"><span class="ic">🗄️</span> Archivio</a>
+        <div class="nav-bottom">
+          <div class="sep"></div>
+          <div class="user-info" id="user-email-label"></div>
+          <button class="btn-logout" onclick="logout()">
+            <span class="ic">🚪</span> Esci
+          </button>
+        </div>
       </nav>
     </aside>
 
@@ -168,6 +268,81 @@
   </div>
 
   <script>
+    // ─── SUPABASE AUTH ────────────────────────────────────────────────────────
+    const SUPABASE_URL  = 'https://xxddmyglmjgibgvgfoit.supabase.co';
+    const SUPABASE_ANON = 'sb_publishable_IEkj3z7XbjFiyANcC2o9sQ_Tf0UeLK2';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    let currentTab = 'login';
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+      document.getElementById('tab-signup').classList.toggle('active', tab === 'signup');
+      document.getElementById('auth-submit').textContent = tab === 'login' ? 'Accedi' : 'Registrati';
+      document.getElementById('auth-password').autocomplete = tab === 'login' ? 'current-password' : 'new-password';
+      setAuthMsg('', '');
+    }
+
+    function setAuthMsg(text, type) {
+      const el = document.getElementById('auth-msg');
+      el.textContent = text;
+      el.className = 'auth-msg' + (type ? ' ' + type : '');
+    }
+
+    async function submitAuth() {
+      const email    = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-password').value;
+      const btn      = document.getElementById('auth-submit');
+
+      if (!email || !password) { setAuthMsg('Inserisci email e password.', 'err'); return; }
+
+      btn.disabled = true;
+      setAuthMsg('…', '');
+
+      let error;
+      if (currentTab === 'login') {
+        ({ error } = await supabase.auth.signInWithPassword({ email, password }));
+      } else {
+        ({ error } = await supabase.auth.signUp({ email, password }));
+        if (!error) {
+          setAuthMsg('Registrazione completata! Controlla la tua email per confermare l\'account.', 'ok');
+          btn.disabled = false;
+          return;
+        }
+      }
+
+      btn.disabled = false;
+      if (error) {
+        const msg = error.message.includes('Invalid login') ? 'Email o password errati.'
+                  : error.message.includes('already registered') ? 'Email già registrata.'
+                  : error.message;
+        setAuthMsg(msg, 'err');
+      }
+    }
+
+    async function logout() {
+      await supabase.auth.signOut();
+    }
+
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        document.getElementById('auth-overlay').classList.add('hidden');
+        document.getElementById('app').classList.add('visible');
+        const email = session.user.email;
+        document.getElementById('user-email-label').textContent = email;
+        carica();
+      } else {
+        document.getElementById('auth-overlay').classList.remove('hidden');
+        document.getElementById('app').classList.remove('visible');
+        RICHIESTE = [];
+      }
+    });
+
+    document.getElementById('auth-email').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('auth-password').focus(); });
+    document.getElementById('auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+
+    // ─── DASHBOARD ────────────────────────────────────────────────────────────
     let RICHIESTE = [];
     let filtro = 'tutti';
     let cerca = '';
@@ -281,7 +456,6 @@
       d.querySelector('#btn-salta').onclick = () => logAzione('salta', r, ta.value, msg);
     }
 
-    // STEP 2: invio reale WhatsApp via il server (che parla con WAHA)
     async function inviaWhatsapp(r, testo, msg, btn) {
       msg.style.color = 'var(--muted)';
       msg.textContent = 'invio in corso…';
@@ -309,7 +483,6 @@
       }
     }
 
-    // STEP 2-bis: invio reale Mail via il server (che parla con SMTP)
     async function inviaMail(r, testo, msg, btn) {
       msg.style.color = 'var(--muted)';
       msg.textContent = 'invio in corso…';
@@ -337,7 +510,6 @@
       }
     }
 
-    // Persiste lo stato "gestita" su richieste.json e sposta la richiesta in Archivio
     async function archivia(r, msg) {
       try {
         const res = await fetch('/api/stato', {
@@ -424,7 +596,6 @@
           '<div style="padding:30px;color:#fca5a5">Errore caricamento: ' + e.message + '</div>';
       }
     }
-    carica();
   </script>
 </body>
 </html>
