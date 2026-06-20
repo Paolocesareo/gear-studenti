@@ -326,11 +326,11 @@
     }
 
     supabase.auth.onAuthStateChange((event, session) => {
+      SESSION = session;
       if (session) {
         document.getElementById('auth-overlay').classList.add('hidden');
         document.getElementById('app').classList.add('visible');
-        const email = session.user.email;
-        document.getElementById('user-email-label').textContent = email;
+        document.getElementById('user-email-label').textContent = session.user.email;
         carica();
       } else {
         document.getElementById('auth-overlay').classList.remove('hidden');
@@ -348,6 +348,7 @@
     let cerca = '';
     let selId = null;
     let vista = 'inbox';
+    let SESSION = null;
 
     const isWA = (c) => c === 'whatsapp';
     const chIcon = (c) => isWA(c) ? '💬' : '✉️';
@@ -511,26 +512,31 @@
     }
 
     async function archivia(r, msg) {
-      try {
-        const res = await fetch('/api/stato', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: r.id, stato: 'gestita' })
-        });
-        const out = await res.json();
-        if (res.ok && out.ok) {
-          r.stato = 'gestita';
-          msg.textContent += ' — spostata in Archivio';
-          aggiornaContatori();
-          renderLista();
-        } else {
-          msg.style.color = 'var(--media)';
-          msg.textContent += ' (stato NON salvato: ' + (out.errore || ('HTTP ' + res.status)) + ')';
-        }
-      } catch (e) {
+      const ta = document.getElementById('bozza');
+      const bozzaAggiornata = ta ? ta.value : (r.bozza ?? '');
+      const { error } = await supabase
+        .from('richieste')
+        .update({ stato: 'gestita', bozza: bozzaAggiornata })
+        .eq('id', r.id);
+      if (!error) {
+        r.stato = 'gestita';
+        r.bozza = bozzaAggiornata;
+        msg.textContent += ' — spostata in Archivio';
+        aggiornaContatori();
+        renderLista();
+      } else {
         msg.style.color = 'var(--media)';
-        msg.textContent += ' (errore salvataggio stato: ' + e.message + ')';
+        msg.textContent += ' (stato NON salvato: ' + error.message + ')';
       }
+    }
+
+    // Inserisce una nuova richiesta registrando l'user_id dell'utente loggato.
+    async function inserisciRichiesta(dati) {
+      if (!SESSION) throw new Error('utente non autenticato');
+      const { error } = await supabase
+        .from('richieste')
+        .insert({ ...dati, user_id: SESSION.user.id });
+      if (error) throw error;
     }
 
     async function logAzione(azione, r, testo, msg) {
@@ -584,9 +590,12 @@
 
     async function carica() {
       try {
-        const res = await fetch('/api/richieste');
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        RICHIESTE = await res.json();
+        const { data, error } = await supabase
+          .from('richieste')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        RICHIESTE = data;
         aggiornaContatori();
         renderLista();
         bindNav();
