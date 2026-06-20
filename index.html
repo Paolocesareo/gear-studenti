@@ -494,15 +494,25 @@
 
     // ─── POLLING GMAIL → SUPABASE (via Netlify Function) ─────────────────────
 
+    let pollInCorso = false;
     async function pollGmail() {
-      if (!SESSION) return;
+      if (!SESSION || pollInCorso) return;
+      pollInCorso = true;
+      const badge = document.getElementById('gmail-badge');
+      const testoOriginale = badge?.textContent;
+      if (badge?.classList.contains('on')) badge.textContent = '⟳ controllo…';
       try {
         const res = await fetch('/api/poll-gmail', { method: 'POST', headers: authHeaders() });
         const out = await res.json();
         if (out.ok && out.inserite > 0) {
           await carica();
         }
-      } catch (e) {}
+        if (badge?.classList.contains('on')) badge.textContent = testoOriginale;
+      } catch (e) {
+        if (badge?.classList.contains('on')) badge.textContent = testoOriginale;
+      } finally {
+        pollInCorso = false;
+      }
     }
 
     // ─── DASHBOARD ────────────────────────────────────────────────────────────

@@ -38,7 +38,8 @@ export default async function handler(req) {
     await client.connect();
     const lock = await client.getMailboxLock('INBOX');
     try {
-      const nonLette = await client.search({ seen: false });
+      const tutteNonLette = await client.search({ seen: false });
+      const nonLette = tutteNonLette.slice(-20); // massimo 20 per volta, le più recenti
       if (nonLette.length > 0) {
         for await (const msg of client.fetch(nonLette, { envelope: true, source: true })) {
           const parsed = await simpleParser(msg.source);

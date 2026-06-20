@@ -7,6 +7,10 @@
 
 [functions]
   node_bundler = "nft"
+  included_files = ["netlify/functions/**"]
+
+[functions."poll-gmail"]
+  timeout = 26
 
 # Mappa /api/* → Netlify Functions (compatibilità con il codice esistente)
 [[redirects]]
