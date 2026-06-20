@@ -37,8 +37,33 @@ export default async function handler(req) {
       const nonLette = tutteNonLette.slice(-20);
       if (nonLette.length > 0) {
         for await (const msg of client.fetch(nonLette, { envelope: true, source: true })) {
+          const from  = msg.envelope?.from?.[0];
+          const fromAddr = (from?.address || '').toLowerCase();
+
+          // Salta email automatiche: notifiche Google, noreply, newsletter
+          const automatica =
+            fromAddr.includes('noreply') ||
+            fromAddr.includes('no-reply') ||
+            fromAddr.endsWith('@google.com') ||
+            fromAddr.endsWith('@accounts.google.com') ||
+            fromAddr.endsWith('@googlemail.com') ||
+            fromAddr.includes('calendar-notification') ||
+            fromAddr.includes('mailer-daemon');
+
+          if (automatica) {
+            // Marca come letta ma non importa in GEAR
+            await client.messageFlagsAdd(msg.seq, ['\\Seen']);
+            continue;
+          }
+
           const parsed = await simpleParser(msg.source);
-          const from   = msg.envelope?.from?.[0];
+
+          // Salta anche se ha header List-Unsubscribe (newsletter/mailing list)
+          const isNewsletter = !!(parsed.headers?.get('list-unsubscribe') || parsed.headers?.get('list-id'));
+          if (isNewsletter) {
+            await client.messageFlagsAdd(msg.seq, ['\\Seen']);
+            continue;
+          }
 
           const { error } = await supabase.from('richieste').insert({
             id:        'MAIL-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7).toUpperCase(),
