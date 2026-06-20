@@ -429,8 +429,11 @@ const server = http.createServer((req, res) => {
   if (!full.startsWith(APP_DIR)) { res.writeHead(403); res.end('forbidden'); return; }
   fs.readFile(full, (err, data) => {
     if (err) { res.writeHead(404); res.end('not found'); return; }
+    const ext   = path.extname(full);
     const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css' };
-    res.writeHead(200, { 'Content-Type': types[path.extname(full)] || 'application/octet-stream' });
+    const hdrs  = { 'Content-Type': types[ext] || 'application/octet-stream' };
+    if (ext === '.html') hdrs['Cache-Control'] = 'no-store';
+    res.writeHead(200, hdrs);
     res.end(data);
   });
 });
