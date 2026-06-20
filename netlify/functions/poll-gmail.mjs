@@ -1,9 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
 import { ImapFlow }    from 'imapflow';
 import { simpleParser } from 'mailparser';
-
-const SUPABASE_URL  = 'https://xxddmyglmjgibgvgfoit.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4ZGRteWdsbWpnaWJndmdmb2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NDQ4NTEsImV4cCI6MjA5NzUyMDg1MX0.yJw0YBxIV5q_YZ0SUt7HQ3Zj518H3t76EK-draOsnn8';
+import { makeSupabase } from './_supabase.mjs';
 
 export default async function handler(req) {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -11,9 +8,7 @@ export default async function handler(req) {
   const jwt = req.headers.get('authorization')?.replace('Bearer ', '');
   if (!jwt) return Response.json({ ok: false, errore: 'Non autenticato' }, { status: 401 });
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
-    global: { headers: { Authorization: `Bearer ${jwt}` } }
-  });
+  const supabase = makeSupabase(jwt);
 
   const { data: { user }, error: authErr } = await supabase.auth.getUser();
   if (authErr || !user) return Response.json({ ok: false, errore: 'Sessione non valida' }, { status: 401 });
@@ -39,7 +34,7 @@ export default async function handler(req) {
     const lock = await client.getMailboxLock('INBOX');
     try {
       const tutteNonLette = await client.search({ seen: false });
-      const nonLette = tutteNonLette.slice(-20); // massimo 20 per volta, le più recenti
+      const nonLette = tutteNonLette.slice(-20);
       if (nonLette.length > 0) {
         for await (const msg of client.fetch(nonLette, { envelope: true, source: true })) {
           const parsed = await simpleParser(msg.source);

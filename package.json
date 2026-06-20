@@ -8,6 +8,7 @@
     "@supabase/supabase-js": "^2.49.4",
     "imapflow": "^1.0.163",
     "mailparser": "^3.7.1",
-    "nodemailer": "^6.9.14"
+    "nodemailer": "^6.9.14",
+    "ws": "^8.18.0"
   }
 }

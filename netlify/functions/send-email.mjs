@@ -1,8 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-import nodemailer       from 'nodemailer';
-
-const SUPABASE_URL  = 'https://xxddmyglmjgibgvgfoit.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4ZGRteWdsbWpnaWJndmdmb2l0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE5NDQ4NTEsImV4cCI6MjA5NzUyMDg1MX0.yJw0YBxIV5q_YZ0SUt7HQ3Zj518H3t76EK-draOsnn8';
+import nodemailer   from 'nodemailer';
+import { makeSupabase } from './_supabase.mjs';
 
 export default async function handler(req) {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -10,10 +7,7 @@ export default async function handler(req) {
   const jwt = req.headers.get('authorization')?.replace('Bearer ', '');
   if (!jwt) return Response.json({ ok: false, errore: 'Non autenticato' }, { status: 401 });
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
-    global: { headers: { Authorization: `Bearer ${jwt}` } }
-  });
-
+  const supabase = makeSupabase(jwt);
   const { data: { user }, error: authErr } = await supabase.auth.getUser();
   if (authErr || !user) return Response.json({ ok: false, errore: 'Sessione non valida' }, { status: 401 });
 
@@ -37,10 +31,8 @@ export default async function handler(req) {
       auth: { user: settings.gmail_user, pass: settings.gmail_app_password }
     });
     const info = await transporter.sendMail({
-      from:    settings.gmail_user,
-      to:      destinatario,
-      subject: oggetto || '(senza oggetto)',
-      text:    testo
+      from: settings.gmail_user, to: destinatario,
+      subject: oggetto || '(senza oggetto)', text: testo
     });
     return Response.json({ ok: true, messageId: info.messageId });
   } catch (e) {
