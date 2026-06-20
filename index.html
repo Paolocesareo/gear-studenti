@@ -426,12 +426,14 @@
     async function aggiornaGmailBadge() {
       if (!SESSION) return;
       try {
-        const { data } = await supabase.from('user_settings').select('gmail_user').maybeSingle();
+        const { data } = await supabase.from('user_settings')
+          .select('gmail_user, gmail_app_password').maybeSingle();
         const badge = document.getElementById('gmail-badge');
         if (data?.gmail_user) {
           badge.className = 'gmail-badge on';
           badge.textContent = data.gmail_user;
           document.getElementById('gm-user').value = data.gmail_user;
+          if (data.gmail_app_password) document.getElementById('gm-pass').value = data.gmail_app_password;
         } else {
           badge.className = 'gmail-badge off';
           badge.textContent = 'non collegata';
@@ -464,12 +466,13 @@
       // Salva temporaneamente e tenta un poll (0 email attese = connessione OK)
       await supabase.from('user_settings').upsert({ user_id: SESSION.user.id, gmail_user: user, gmail_app_password: pass });
       const res = await fetch('/api/poll-gmail', { method: 'POST', headers: authHeaders() });
-      const out = await res.json();
+      let out;
+      try { out = await res.json(); } catch(_) { out = { ok: false, errore: 'HTTP ' + res.status }; }
       btn.disabled = false;
       if (out.ok) {
-        setGmailMsg('✓ Connessione riuscita! Clicca Salva per confermare.', 'ok');
+        setGmailMsg('✓ Connessione riuscita! (' + (out.inserite || 0) + ' email nuove). Clicca Salva.', 'ok');
       } else {
-        setGmailMsg('✗ ' + (out.errore || 'errore sconosciuto'), 'err');
+        setGmailMsg('✗ [' + res.status + '] ' + (out.errore || JSON.stringify(out)), 'err');
       }
     }
 
