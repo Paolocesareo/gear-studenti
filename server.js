@@ -125,34 +125,37 @@ async function pollImap() {
 
     const lock = await client.getMailboxLock(cfg.casella || 'INBOX');
     try {
-      for await (const msg of client.fetch('UNSEEN', { envelope: true, source: true })) {
-        const msgId = msg.envelope?.messageId;
-        if (msgId && seenIds.has(msgId)) continue;
+      const nonLette = await client.search({ seen: false });
+      if (nonLette.length > 0) {
+        for await (const msg of client.fetch(nonLette, { envelope: true, source: true })) {
+          const msgId = msg.envelope?.messageId;
+          if (msgId && seenIds.has(msgId)) continue;
 
-        const parsed = await simpleParser(msg.source);
-        const from   = msg.envelope?.from?.[0];
-        const nome   = from?.name || from?.address || 'Sconosciuto';
-        const email  = from?.address || '';
-        const testo  = (parsed.text || '').trim()
-                    || (parsed.html || '').replace(/<[^>]+>/g, ' ').trim()
-                    || '(testo vuoto)';
+          const parsed = await simpleParser(msg.source);
+          const from   = msg.envelope?.from?.[0];
+          const nome   = from?.name || from?.address || 'Sconosciuto';
+          const email  = from?.address || '';
+          const testo  = (parsed.text || '').trim()
+                      || (parsed.html || '').replace(/<[^>]+>/g, ' ').trim()
+                      || '(testo vuoto)';
 
-        queue.push({
-          id:        'MAIL-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7).toUpperCase(),
-          canale:    'mail',
-          mittente:  nome,
-          contatto:  email,
-          oggetto:   msg.envelope?.subject || '(senza oggetto)',
-          testo,
-          categoria: null,
-          fornitore_suggerito: null,
-          urgenza:   'media',
-          bozza:     null,
-          stato:     'aperta',
-          messageId: msgId
-        });
-        aggiunte++;
-        await client.messageFlagsAdd(msg.seq, ['\\Seen']);
+          queue.push({
+            id:        'MAIL-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7).toUpperCase(),
+            canale:    'mail',
+            mittente:  nome,
+            contatto:  email,
+            oggetto:   msg.envelope?.subject || '(senza oggetto)',
+            testo,
+            categoria: null,
+            fornitore_suggerito: null,
+            urgenza:   'media',
+            bozza:     null,
+            stato:     'aperta',
+            messageId: msgId
+          });
+          aggiunte++;
+          await client.messageFlagsAdd(msg.seq, ['\\Seen']);
+        }
       }
     } finally {
       lock.release();
@@ -164,7 +167,7 @@ async function pollImap() {
     }
     await client.logout();
   } catch (e) {
-    console.error('[GEAR][imap] errore:', e.message);
+    console.error('[GEAR][imap] errore:', e.responseText || e.serverResponseCode || e.message, e.stack ? e.stack.split('\n')[1] : '');
     try { if (client) await client.logout(); } catch (_) {}
   }
 }
